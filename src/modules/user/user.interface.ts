@@ -18,7 +18,7 @@ export type TUser = {
   emailVerificationExpires?: Date;
   forgetPasswordCode?: string;
   forgetPasswordExpires?: Date;
-  firbaseToken?: string;
+  firebaseToken?: string;
   isResettingPassword?: boolean;
   passwordChangeTime?: Date;
 };

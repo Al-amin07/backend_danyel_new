@@ -26,7 +26,7 @@ const UserSchema = new Schema<TUser>(
     forgetPasswordCode: { type: String },
     forgetPasswordExpires: { type: Date },
     passwordChangeTime: { type: Date },
-    firbaseToken: { type: String },
+    firebaseToken: { type: String },
     lastLoggedin: { type: Date },
     isVerified: { type: Boolean, default: false },
   },

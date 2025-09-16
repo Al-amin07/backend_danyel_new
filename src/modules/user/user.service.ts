@@ -288,7 +288,7 @@ const addFirebaseToken = async (userId: string, payload: { token: string }) => {
   // console.log({ isUserExist, payload });
   const result = await User.findByIdAndUpdate(
     userId,
-    { firbaseToken: payload?.token },
+    { firebaseToken: payload?.token },
     { new: true },
   ).select('-password');
   // console.log({ result });
