@@ -6,6 +6,7 @@ import { userRole } from '../../constents';
 const route = Router();
 
 route.get('/', notificationController.getAllNotification);
+route.get('/single/:id', notificationController.getSingleNotification);
 route.post('/', notificationController.sendNotification);
 route.patch('/mark-as-read', notificationController.markNotificationsAsRead);
 route.patch(

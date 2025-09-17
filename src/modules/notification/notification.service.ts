@@ -87,14 +87,31 @@ const getAllNotification = async () => {
   const result = await Notification.find()
     .populate({
       path: 'senderId',
-      select: 'name email profileImage',
+      select: 'name email profileImage _id',
     })
     .populate({
       path: 'receiverId',
-      select: 'name email profileImage',
+      select: 'name email profileImage _id',
     })
     .sort({ createdAt: -1 });
   return result;
+};
+
+const getSingleNotificationData = async (id: string) => {
+  const notification = await Notification.findById(id)
+    .populate({
+      path: 'senderId',
+      select: 'name email profileImage _id',
+    })
+    .populate({
+      path: 'receiverId',
+      select: 'name email profileImage _id',
+    })
+    .populate({
+      path: 'load',
+      populate: 'companyId',
+    });
+  return notification;
 };
 
 const getMyNotification = async (id: string) => {
@@ -150,4 +167,5 @@ export const notificationService = {
   sendNotification,
   markNotificationsAsRead,
   changeNotificationPreferences,
+  getSingleNotificationData,
 };
