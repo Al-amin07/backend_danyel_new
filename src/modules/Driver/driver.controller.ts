@@ -151,7 +151,12 @@ const declinedLoads = catchAsync(async (req: Request, res: Response) => {
   });
 });
 const suggestedDriver = catchAsync(async (req: Request, res: Response) => {
-  const result = await driverService.suggestedDriver(req.body);
+  console.log('In suggested', req.params);
+  const { lat, lon } = req.params;
+  const result = await driverService.suggestedDriver({
+    pickupLat: Number(lat),
+    pickupLng: Number(lon),
+  });
   sendResponse(res, {
     success: true,
     message: 'Drivers retrived  successfully',
@@ -162,6 +167,15 @@ const suggestedDriver = catchAsync(async (req: Request, res: Response) => {
 const sendLoadRequest = catchAsync(async (req: Request, res: Response) => {
   const userId = (req.user as JwtPayload).id;
   const result = await driverService.sendLoadRequest(req.body, userId);
+  sendResponse(res, {
+    success: true,
+    message: 'Load request send successfull. Wait for approval',
+    data: result,
+    statusCode: StatusCodes.OK,
+  });
+});
+const setDriverLocation = catchAsync(async (req: Request, res: Response) => {
+  const result = await driverService.setDriverLocation();
   sendResponse(res, {
     success: true,
     message: 'Load request send successfull. Wait for approval',
@@ -184,4 +198,5 @@ export const driverController = {
   declinedLoads,
   suggestedDriver,
   sendLoadRequest,
+  setDriverLocation,
 };

@@ -14,7 +14,7 @@ driverRoute.get(
   driverController.getAllDriver,
 );
 driverRoute.get(
-  '/suggested-drivers',
+  '/suggested-drivers/:lat/:lon',
   // auth(userRole.admin, userRole.company, userRole.superAdmin),
   driverController.suggestedDriver,
 );
@@ -93,6 +93,11 @@ driverRoute.patch(
   '/send-load-request',
   auth(userRole.driver),
   driverController.sendLoadRequest,
+);
+driverRoute.patch(
+  '/set-location',
+
+  driverController.setDriverLocation,
 );
 
 export default driverRoute;

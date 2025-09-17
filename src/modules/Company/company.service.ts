@@ -11,6 +11,7 @@ import { ENotificationType } from '../notification/notification.interface';
 import { ILoad } from '../load/load.interface';
 import { User } from '../user/user.model';
 import { Driver } from '../Driver/driver.model';
+import path from 'path';
 
 const getAllCompanyFromDb = async (query: Record<string, unknown>) => {
   const companyQuery = new QueryBuilder(Company.find(), query)
@@ -416,6 +417,74 @@ const sendNotificationToSuggestedDrivers = async (
   }
 };
 
+const acceptLoadRequest = async (payload: {
+  loadId: string;
+  userId: string;
+}) => {
+  const isLoadExist = await LoadModel.findById(payload.loadId).populate({
+    path: 'companyId',
+    populate: { path: 'user' },
+  });
+  if (!isLoadExist) {
+    throw new ApppError(StatusCodes.NOT_FOUND, 'Load not found');
+  }
+  const isDriverExist = await Driver.findOne({ user: payload.userId }).populate(
+    'user',
+  );
+  if (!isDriverExist) {
+    throw new ApppError(StatusCodes.NOT_FOUND, 'Driver not found');
+  }
+  if (isDriverExist.currentLoad) {
+    throw new ApppError(StatusCodes.BAD_REQUEST, 'Driver already has a load');
+  }
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    // 1️⃣ Update Load directly
+    const updatedLoad = await LoadModel.findByIdAndUpdate(
+      payload.loadId,
+      {
+        assignedDriver: isDriverExist?.id,
+        loadStatus: 'Assigned',
+        $push: {
+          statusTimeline: {
+            status: 'Assigned',
+            timestamp: new Date(),
+            notes: `Load assigned to driver ID: ${isDriverExist.id}`,
+          },
+        },
+      },
+      { new: true, session },
+    );
+
+    // 2️⃣ Update Driver directly
+    const updatedDriver = await Driver.findByIdAndUpdate(
+      isDriverExist?.id,
+      { currentLoad: payload.loadId, availability: 'On Duty' },
+      { new: true, session },
+    ).populate('user');
+    if (updatedDriver) {
+      await notificationService.sendNotification({
+        content: `Load ${updatedLoad?.loadId} has been assigned to you`,
+        type: ENotificationType.LOAD_ASSIGNMENT,
+        receiverId: (updatedDriver?.user as any)?.id,
+        load: updatedLoad?.id,
+        senderId: (isLoadExist?.companyId as any)?.user?.id,
+      });
+    }
+
+    // ✅ Commit transaction
+    await session.commitTransaction();
+    session.endSession();
+    return updatedLoad;
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
+  }
+};
+
 export const companyService = {
   getAllCompanyFromDb,
   getSingleCompany,
@@ -424,4 +493,5 @@ export const companyService = {
   companyStat,
   sendNotificationToSuggestedDrivers,
   getCompanyEarning,
+  acceptLoadRequest,
 };

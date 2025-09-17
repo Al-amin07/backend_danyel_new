@@ -88,6 +88,16 @@ const getCompanyEarning = catchAsync(async (req: Request, res: Response) => {
     statusCode: StatusCodes.OK,
   });
 });
+const acceptLoadRequest = catchAsync(async (req: Request, res: Response) => {
+  const result = await companyService.acceptLoadRequest(req.body);
+
+  sendResponse(res, {
+    data: result,
+    message: 'Load request accept successfully',
+    success: true,
+    statusCode: StatusCodes.OK,
+  });
+});
 
 export const companyController = {
   getAllCompany,
@@ -97,4 +107,5 @@ export const companyController = {
   companyState,
   sendNotificationToSuggestedDrivers,
   getCompanyEarning,
+  acceptLoadRequest,
 };

@@ -6,7 +6,13 @@ import { LoadModel } from '../load/load.model';
 import mongoose, { Types } from 'mongoose';
 import ApppError from '../../error/AppError';
 import { StatusCodes } from 'http-status-codes';
-import { EAvailability, IReview } from './driver.interface';
+import {
+  EAvailability,
+  EVehicleModel,
+  EVehicleType,
+  ILocation,
+  IReview,
+} from './driver.interface';
 import QueryBuilder from '../../builder/QueryBuilder';
 import { ILoad, IStatusTimeline } from '../load/load.interface';
 import { getLoadNote } from '../load/load.constant';
@@ -495,35 +501,62 @@ const suggestedDriver = async (payload: {
   pickupLng: number;
 }) => {
   console.log({ payload });
-  const nearbyDrivers = await Driver.find({
-    availability: 'AVAILABLE',
-    'location.coordinates': { $exists: true },
-    'location.type': 'Point',
-    location: {
-      $near: {
-        $geometry: {
-          type: 'Point',
-          coordinates: [payload?.pickupLng, payload?.pickupLat], // [lng, lat]
-        },
-        $maxDistance: 300000,
-      },
-    },
-  });
-  console.log({ nearbyDrivers });
+  const haversineDistance = (
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number,
+  ) => {
+    const R = 6371e3; // meters
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const φ1 = toRad(lat1);
+    const φ2 = toRad(lat2);
+    const Δφ = toRad(lat2 - lat1);
+    const Δλ = toRad(lon2 - lon1);
 
-  if (!nearbyDrivers.length) {
-    return [];
-  }
+    const a =
+      Math.sin(Δφ / 2) ** 2 +
+      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // distance in meters
+  };
+  const allDrivers = await Driver.find({ availability: 'Available' }).populate(
+    'user',
+  );
+
+  const nearbyDriversWithDistance = allDrivers
+    .map((driver) => {
+      const [lng, lat] = (driver.location as ILocation).coordinates;
+      const distance = haversineDistance(
+        lat,
+        lng,
+        payload.pickupLat,
+        payload.pickupLng,
+      );
+      return { driver, distance };
+    })
+    .filter(({ distance }) => distance <= 30000) // within 300 km
+    .sort((a, b) => a.distance - b.distance); // closest first
+
+  // Optional: extract only drivers if you don’t need distance
+  const nearbyDrivers = nearbyDriversWithDistance.map(({ driver }) => driver);
+  // const result = nearbyDrivers.map((el) => el.location);
+
   return nearbyDrivers;
 };
 
 const sendLoadRequest = async (payload: { loadId: string }, userId: string) => {
-  const isDriverExist = await Driver.findOne({ user: userId });
+  const isDriverExist = await Driver.findOne({ user: userId }).populate('user');
   if (!isDriverExist) {
     throw new ApppError(StatusCodes.NOT_FOUND, 'Driver not found');
   }
   if (isDriverExist.currentLoad) {
-    throw new ApppError(StatusCodes.BAD_REQUEST, 'You already have a load');
+    throw new ApppError(
+      StatusCodes.BAD_REQUEST,
+      'You already have a load. Complete it first',
+    );
   }
   const isLoadExist = await LoadModel.findById(payload?.loadId).populate({
     path: 'companyId',
@@ -534,7 +567,7 @@ const sendLoadRequest = async (payload: { loadId: string }, userId: string) => {
   }
 
   await notificationService.sendNotification({
-    content: `${isDriverExist?.driverId ? isDriverExist?.driverId : isDriverExist?.id} has requested to pickup load ${isLoadExist?.loadId}`,
+    content: `${(isDriverExist?.user as any)?.name} has requested to pickup load ${isLoadExist?.loadId}`,
     type: ENotificationType.LOAD_ASSIGNMENT_REQUEST,
     receiverId: (isLoadExist?.companyId as any)?.user?._id,
     load: isLoadExist?.id,
@@ -548,6 +581,206 @@ const sendLoadRequest = async (payload: { loadId: string }, userId: string) => {
     { new: true },
   );
   return updatedLoad;
+};
+
+const setDriverLocation = async () => {
+  const locations = [
+    // Golden Gate Bridge + nearby
+    {
+      name: 'Golden Gate Bridge',
+      street: 'Golden Gate Bridge',
+      city: 'San Francisco',
+      state: 'CA',
+      zipCode: '94129',
+      country: 'USA',
+      lat: 37.819912,
+      lon: -122.478661,
+    },
+    {
+      name: 'Pier 39',
+      street: 'Beach St & The Embarcadero',
+      city: 'San Francisco',
+      state: 'CA',
+      zipCode: '94133',
+      country: 'USA',
+      lat: 37.809326,
+      lon: -122.409981,
+    },
+    {
+      name: 'Alcatraz Island',
+      street: 'Alcatraz Island',
+      city: 'San Francisco',
+      state: 'CA',
+      zipCode: '94133',
+      country: 'USA',
+      lat: 37.826977,
+      lon: -122.422956,
+    },
+    {
+      name: "Fisherman's Wharf",
+      street: "Fisherman's Wharf",
+      city: 'San Francisco',
+      state: 'CA',
+      zipCode: '94133',
+      country: 'USA',
+      lat: 37.808,
+      lon: -122.417743,
+    },
+
+    // Willis Tower + nearby
+    {
+      name: 'Willis Tower (Sears Tower)',
+      street: '233 S Wacker Dr',
+      city: 'Chicago',
+      state: 'IL',
+      zipCode: '60606',
+      country: 'USA',
+      lat: 41.878876,
+      lon: -87.635918,
+    },
+    {
+      name: 'Skydeck Chicago',
+      street: '233 S Wacker Dr',
+      city: 'Chicago',
+      state: 'IL',
+      zipCode: '60606',
+      country: 'USA',
+      lat: 41.878838,
+      lon: -87.63604,
+    },
+    {
+      name: 'Millennium Park',
+      street: '201 E Randolph St',
+      city: 'Chicago',
+      state: 'IL',
+      zipCode: '60602',
+      country: 'USA',
+      lat: 41.8826,
+      lon: -87.6226,
+    },
+
+    // Walt Disney World Resort + nearby
+    {
+      name: 'Walt Disney World Resort',
+      street: '1180 Seven Seas Dr',
+      city: 'Lake Buena Vista',
+      state: 'FL',
+      zipCode: '32830',
+      country: 'USA',
+      lat: 28.385233,
+      lon: -81.563873,
+    },
+    {
+      name: 'Magic Kingdom Park',
+      street: '1180 Seven Seas Dr',
+      city: 'Lake Buena Vista',
+      state: 'FL',
+      zipCode: '32830',
+      country: 'USA',
+      lat: 28.4194,
+      lon: -81.5812,
+    },
+    {
+      name: 'EPCOT',
+      street: '200 Epcot Center Dr',
+      city: 'Lake Buena Vista',
+      state: 'FL',
+      zipCode: '32830',
+      country: 'USA',
+      lat: 28.3747,
+      lon: -81.5494,
+    },
+
+    // Space Needle + nearby
+    {
+      name: 'Space Needle',
+      street: '400 Broad St',
+      city: 'Seattle',
+      state: 'WA',
+      zipCode: '98109',
+      country: 'USA',
+      lat: 47.620422,
+      lon: -122.349358,
+    },
+    {
+      name: 'Chihuly Garden and Glass',
+      street: '305 Harrison St',
+      city: 'Seattle',
+      state: 'WA',
+      zipCode: '98109',
+      country: 'USA',
+      lat: 47.6222,
+      lon: -122.3493,
+    },
+    {
+      name: 'Museum of Pop Culture (MoPOP)',
+      street: '325 5th Ave N',
+      city: 'Seattle',
+      state: 'WA',
+      zipCode: '98109',
+      country: 'USA',
+      lat: 47.6216,
+      lon: -122.3489,
+    },
+
+    // Liberty Bell + nearby
+    {
+      name: 'Liberty Bell',
+      street: '526 Market St',
+      city: 'Philadelphia',
+      state: 'PA',
+      zipCode: '19106',
+      country: 'USA',
+      lat: 39.949562,
+      lon: -75.150391,
+    },
+    {
+      name: 'Independence Hall',
+      street: '520 Chestnut St',
+      city: 'Philadelphia',
+      state: 'PA',
+      zipCode: '19106',
+      country: 'USA',
+      lat: 39.9489,
+      lon: -75.15,
+    },
+    {
+      name: 'National Constitution Center',
+      street: '525 Arch St',
+      city: 'Philadelphia',
+      state: 'PA',
+      zipCode: '19106',
+      country: 'USA',
+      lat: 39.9483,
+      lon: -75.1507,
+    },
+  ];
+
+  const drivers = await Driver.find();
+
+  for (let i = 0; i < drivers.length; i++) {
+    const location = locations[i % locations.length]; // Cycle through locations
+    drivers[i].location = {
+      type: 'Point',
+      coordinates: [location.lon, location.lat],
+      city: location.city,
+      street: location?.street,
+      zipCode: location?.zipCode,
+      state: location?.state,
+      country: location?.country,
+    };
+    drivers[i].vehicleType = drivers[i].vehicleType || EVehicleType.CARGO_VAN; // or any valid EVehicleType
+    drivers[i].vehicleModel =
+      drivers[i].vehicleModel || EVehicleModel.BOX_TRUCK; // only if it's valid in your enum
+    drivers[i].driverId =
+      drivers[i].driverId || (drivers[i] as any)._id.toString();
+    drivers[i].availability = drivers[i].currentLoad
+      ? EAvailability.ON_DUTY
+      : EAvailability.AVAILABLE;
+    // drivers[i].currentLocation = { lat: location.lat, lon: location.lon };
+    await drivers[i].save();
+  }
+  return drivers;
 };
 
 export const driverService = {
@@ -564,6 +797,7 @@ export const driverService = {
   declinedLoads,
   suggestedDriver,
   sendLoadRequest,
+  setDriverLocation,
 };
 
 export const updateDriverOnTimeRate = async (driverId: string) => {

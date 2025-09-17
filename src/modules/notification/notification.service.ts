@@ -59,7 +59,7 @@ export const sendNotification = async (notificationData: INotification) => {
     //   console.log({ receiverSocketId, form: notification, onlineUsers });
     console.log('sgvgfv', receiverSocketId);
     if (receiverSocketId) {
-      io.to(receiverSocketId).emit('receive_notification', notificationData);
+      io.to(receiverSocketId).emit('receive_notification', result);
     }
     if (!user.firebaseToken) return result;
     await fcmAdmin.send({
@@ -71,6 +71,7 @@ export const sendNotification = async (notificationData: INotification) => {
         token: user?.firebaseToken,
         senderId: String(notificationData?.senderId as Types.ObjectId),
         receiverId: String(notificationData?.receiverId as Types.ObjectId),
+        _id: String(notificationData?.receiverId as Types.ObjectId),
       },
     });
 

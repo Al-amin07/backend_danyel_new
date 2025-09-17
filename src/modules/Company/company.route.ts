@@ -32,5 +32,10 @@ companyRoute.post(
   auth(userRole.company),
   companyController.sendNotificationToSuggestedDrivers,
 );
+companyRoute.patch(
+  '/accept-load-request',
+  auth(userRole.company, userRole.admin, userRole.superAdmin),
+  companyController.acceptLoadRequest,
+);
 
 export default companyRoute;

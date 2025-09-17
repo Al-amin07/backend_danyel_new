@@ -41,7 +41,7 @@ const ReviewSchema = new Schema<IReview>({
 const DriverSchema = new Schema<IDriver>(
   {
     user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    location: { type: LocationSchema, required: false }, // GeoJSON location
+    location: { type: LocationSchema, required: false },
     licenseNumber: { type: String },
     currentLoad: { type: Schema.Types.ObjectId, ref: 'Load' },
     vehicleType: {
