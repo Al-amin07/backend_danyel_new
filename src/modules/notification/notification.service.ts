@@ -48,7 +48,7 @@ export const sendNotification = async (notificationData: INotification) => {
   const result = await Notification.create(notificationData);
   console.log({ notificationData });
   const user = await User.findById(notificationData.receiverId);
-  if (!user || !user.firbaseToken) return result; // no token, skip FCM
+  if (!user || !user.firebaseToken) return result; // no token, skip FCM
   // console.log({ notificationData, user });
 
   try {
@@ -63,12 +63,12 @@ export const sendNotification = async (notificationData: INotification) => {
     }
 
     const res = await fcmAdmin.send({
-      token: user.firbaseToken, // ✅ Device token
+      token: user.firebaseToken, // ✅ Device token
       data: {
         title: 'New Notification',
         body: notificationData.content,
         loadId: String(notificationData?.load as Types.ObjectId),
-        token: user?.firbaseToken,
+        token: user?.firebaseToken,
       },
     });
     console.log({ res });
