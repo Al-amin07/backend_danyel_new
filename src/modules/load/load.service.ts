@@ -57,6 +57,7 @@ const createLoadToDB = async (
   }
 
   const delivaryLocation = await getLatLon(deliveryStr);
+  console.log({ delivaryLocation, pickLocation });
   if (!delivaryLocation) {
     throw new ApppError(
       StatusCodes.BAD_REQUEST,
