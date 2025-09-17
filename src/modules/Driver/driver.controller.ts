@@ -159,6 +159,16 @@ const suggestedDriver = catchAsync(async (req: Request, res: Response) => {
     statusCode: StatusCodes.OK,
   });
 });
+const sendLoadRequest = catchAsync(async (req: Request, res: Response) => {
+  const userId = (req.user as JwtPayload).id;
+  const result = await driverService.sendLoadRequest(req.body, userId);
+  sendResponse(res, {
+    success: true,
+    message: 'Load request send successfull. Wait for approval',
+    data: result,
+    statusCode: StatusCodes.OK,
+  });
+});
 
 export const driverController = {
   updateDriverProfile,
@@ -173,4 +183,5 @@ export const driverController = {
   getSingleDriverByUserId,
   declinedLoads,
   suggestedDriver,
+  sendLoadRequest,
 };

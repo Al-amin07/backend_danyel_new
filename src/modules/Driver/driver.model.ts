@@ -81,6 +81,10 @@ const DriverSchema = new Schema<IDriver>(
       COMMUNICATION: { type: Boolean, default: true },
     },
     declinedLoads: [{ type: Schema.Types.ObjectId, ref: 'Load' }],
+    currentLocation: {
+      lat: { type: Number, default: null },
+      lon: { type: Number, default: null },
+    },
   },
   {
     timestamps: true,

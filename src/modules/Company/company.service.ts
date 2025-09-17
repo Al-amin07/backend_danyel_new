@@ -409,9 +409,9 @@ const sendNotificationToSuggestedDrivers = async (
     await notificationService.sendNotification({
       senderId: companyId as unknown as Types.ObjectId, // Company that sends the load
       receiverId: driverId as unknown as Types.ObjectId, // Driver receiving notification
-      type: ENotificationType.LOAD_ASSIGNMENT, // Custom type
+      type: ENotificationType.LOAD_ASSIGNMENT_REQUEST, // Custom type
       content: 'New load available. Do you want to accept it?',
-      load: isLoadExist as ILoad, // Store load reference for driver action
+      load: isLoadExist?.id, // Store load reference for driver action
     });
   }
 };

@@ -89,4 +89,10 @@ driverRoute.patch(
 
 driverRoute.get('/myload', auth(userRole.driver), driverController.myLoad);
 
+driverRoute.patch(
+  '/send-load-request',
+  auth(userRole.driver),
+  driverController.sendLoadRequest,
+);
+
 export default driverRoute;

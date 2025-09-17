@@ -92,7 +92,7 @@ const LeadSchema = new Schema<ILoad>(
     },
     customerNotes: { type: String },
     paymentDate: { type: Date },
-
+    requestedDrivers: { type: [Schema.Types.ObjectId], ref: 'Driver' },
     assignedDriver: { type: Schema.Types.ObjectId, ref: 'Driver' },
     customer: { type: customerSchema, required: true },
     documents: [DocumentSchema],

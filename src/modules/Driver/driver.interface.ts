@@ -119,6 +119,10 @@ export interface IDriver extends Document {
   };
   declinedLoads?: Types.ObjectId[];
   currentLoad?: Types.ObjectId;
+  currentLocation: {
+    lat: number;
+    lon: number;
+  };
 }
 
 export interface IFileType {

@@ -48,30 +48,31 @@ export const sendNotification = async (notificationData: INotification) => {
   const result = await Notification.create(notificationData);
   console.log({ notificationData });
   const user = await User.findById(notificationData.receiverId);
-  if (!user || !user.firebaseToken) return result; // no token, skip FCM
-  // console.log({ notificationData, user });
-
+  // no token, skip FCM
+  console.log({ notificationData, user });
+  if (!user) return;
   try {
     const io = getIO();
     // const receiverSocketId = onlineUsers[String('68b659c9778a2b206a349ed3')];
-
+    console.log('sgdsf');
     const receiverSocketId = onlineUsers[String(notificationData?.receiverId)];
     //   console.log({ receiverSocketId, form: notification, onlineUsers });
     console.log('sgvgfv', receiverSocketId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit('receive_notification', notificationData);
     }
-
-    const res = await fcmAdmin.send({
+    if (!user.firebaseToken) return result;
+    await fcmAdmin.send({
       token: user.firebaseToken, // ✅ Device token
       data: {
         title: 'New Notification',
         body: notificationData.content,
-        loadId: String(notificationData?.load as Types.ObjectId),
+        load: String(notificationData?.load as Types.ObjectId),
         token: user?.firebaseToken,
+        senderId: String(notificationData?.senderId as Types.ObjectId),
+        receiverId: String(notificationData?.receiverId as Types.ObjectId),
       },
     });
-    console.log({ res });
 
     console.log('FCM notification sent successfully to single device');
   } catch (err) {

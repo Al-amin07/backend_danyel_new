@@ -68,6 +68,7 @@ export interface ILoad {
   statusTimeline: IStatusTimeline[];
   customer: ICustomer;
   review?: IReview;
+  requestedDrivers?: Types.ObjectId[];
   documents: IDocument[];
   createdAt?: Date;
 }

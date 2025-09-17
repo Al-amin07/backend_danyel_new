@@ -143,8 +143,7 @@ const updateDriverProfileIntoDb = async (
     ];
     // updateData.location.type = 'Point';
   }
-  const userData = {
-    name: '',
+  const userData: { isProfileUpdate: boolean; name?: string } = {
     isProfileUpdate: true,
   };
   if (name) {
@@ -518,6 +517,36 @@ const suggestedDriver = async (payload: {
   return nearbyDrivers;
 };
 
+const sendLoadRequest = async (payload: { loadId: string }, userId: string) => {
+  const isDriverExist = await Driver.findOne({ user: userId });
+  if (!isDriverExist) {
+    throw new ApppError(StatusCodes.NOT_FOUND, 'Driver not found');
+  }
+  const isLoadExist = await LoadModel.findById(payload?.loadId).populate({
+    path: 'companyId',
+    populate: { path: 'user', select: 'name email profileImage _id' },
+  });
+  if (!isLoadExist) {
+    throw new ApppError(StatusCodes.NOT_FOUND, 'Load not found');
+  }
+
+  await notificationService.sendNotification({
+    content: `${isDriverExist?.driverId ? isDriverExist?.driverId : isDriverExist?.id} has requested to pickup load ${isLoadExist?.loadId}`,
+    type: ENotificationType.LOAD_ASSIGNMENT_REQUEST,
+    receiverId: (isLoadExist?.companyId as any)?.user?._id,
+    load: isLoadExist?.id,
+    senderId: new mongoose.Types.ObjectId(userId),
+  });
+  const updatedLoad = await LoadModel.findByIdAndUpdate(
+    isLoadExist?.id,
+    {
+      $addToSet: { requestedDrivers: isDriverExist?.id },
+    },
+    { new: true },
+  );
+  return updatedLoad;
+};
+
 export const driverService = {
   updateDriverProfileIntoDb,
   assignLoadToDriver,
@@ -531,6 +560,7 @@ export const driverService = {
   getSingleDriverByUserId,
   declinedLoads,
   suggestedDriver,
+  sendLoadRequest,
 };
 
 export const updateDriverOnTimeRate = async (driverId: string) => {
