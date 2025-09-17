@@ -522,6 +522,9 @@ const sendLoadRequest = async (payload: { loadId: string }, userId: string) => {
   if (!isDriverExist) {
     throw new ApppError(StatusCodes.NOT_FOUND, 'Driver not found');
   }
+  if (isDriverExist.currentLoad) {
+    throw new ApppError(StatusCodes.BAD_REQUEST, 'You already have a load');
+  }
   const isLoadExist = await LoadModel.findById(payload?.loadId).populate({
     path: 'companyId',
     populate: { path: 'user', select: 'name email profileImage _id' },
