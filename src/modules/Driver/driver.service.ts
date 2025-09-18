@@ -10,6 +10,7 @@ import {
   EAvailability,
   EVehicleModel,
   EVehicleType,
+  IDriver,
   ILocation,
   IReview,
 } from './driver.interface';
@@ -82,13 +83,17 @@ const getSingleDriverByUserId = async (id: string) => {
 };
 const updateDriverProfileIntoDb = async (
   id: string,
-  payload: any,
+  payload: IDriver & { name: string },
 
   files: { [fieldname: string]: Express.Multer.File[] } | undefined,
   // file: Express.Multer.File,
 ) => {
   const folder = 'uploads/drivers';
   const { location, loads, name, ...restDriverData } = payload;
+  const isCompanyExist = await Company.findById(restDriverData?.company);
+  if (!isCompanyExist) {
+    throw new ApppError(StatusCodes.BAD_REQUEST, 'Company not found');
+  }
   console.log({ payload, files });
   if (!fs.existsSync(folder)) {
     fs.mkdirSync(folder, { recursive: true });
@@ -537,7 +542,7 @@ const suggestedDriver = async (payload: {
       );
       return { driver, distance };
     })
-    .filter(({ distance }) => distance <= 30000) // within 300 km
+    .filter(({ distance }) => distance <= 100000) // within 300 km
     .sort((a, b) => a.distance - b.distance); // closest first
 
   // Optional: extract only drivers if you don’t need distance

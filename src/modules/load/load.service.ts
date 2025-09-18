@@ -223,7 +223,8 @@ const getSingleLoad = async (id: string) => {
     .populate({
       path: 'companyId',
       populate: { path: 'user', select: 'name email profileImage role _id' },
-    });
+    })
+    .populate('requestedDrivers');
   if (!result) {
     throw new ApppError(404, 'Load not found');
   }

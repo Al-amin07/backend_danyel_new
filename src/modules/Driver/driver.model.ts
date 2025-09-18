@@ -85,6 +85,7 @@ const DriverSchema = new Schema<IDriver>(
       lat: { type: Number, default: null },
       lon: { type: Number, default: null },
     },
+    company: { type: Schema.Types.ObjectId, ref: 'Company' },
   },
   {
     timestamps: true,

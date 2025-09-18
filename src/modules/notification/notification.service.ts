@@ -65,7 +65,7 @@ export const sendNotification = async (notificationData: INotification) => {
     await fcmAdmin.send({
       token: user.firebaseToken, // ✅ Device token
       data: {
-        title: 'New Notification',
+        type: notificationData.type,
         body: notificationData.content,
         load: String(notificationData?.load as Types.ObjectId),
         token: user?.firebaseToken,

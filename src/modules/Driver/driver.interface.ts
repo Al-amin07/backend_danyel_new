@@ -123,6 +123,7 @@ export interface IDriver extends Document {
     lat: number;
     lon: number;
   };
+  company: Types.ObjectId;
 }
 
 export interface IFileType {
