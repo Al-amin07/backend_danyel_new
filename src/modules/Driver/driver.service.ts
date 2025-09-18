@@ -89,11 +89,21 @@ const updateDriverProfileIntoDb = async (
   // file: Express.Multer.File,
 ) => {
   const folder = 'uploads/drivers';
-  const { location, loads, name, ...restDriverData } = payload;
-  const isCompanyExist = await Company.findById(restDriverData?.company);
-  if (!isCompanyExist) {
-    throw new ApppError(StatusCodes.BAD_REQUEST, 'Company not found');
+  const { location, loads, name, company, ...restDriverData } = payload;
+  if (company) {
+    const isCompanyExist = await Company.findById(company).populate('user');
+    if (!isCompanyExist) {
+      throw new ApppError(StatusCodes.BAD_REQUEST, 'Company not found');
+    }
+    const isDriverExist = await Driver.findOne({ user: id }).populate('user');
+    await notificationService.sendNotification({
+      content: `New join request from ${(isDriverExist?.user as any)?.name}`,
+      type: ENotificationType.JOIN_REQUEST,
+      receiverId: (isCompanyExist?.user as any)?.id,
+      senderId: (isDriverExist?.user as any)?.id,
+    });
   }
+
   console.log({ payload, files });
   if (!fs.existsSync(folder)) {
     fs.mkdirSync(folder, { recursive: true });
@@ -545,9 +555,7 @@ const suggestedDriver = async (payload: {
     .filter(({ distance }) => distance <= 100000) // within 300 km
     .sort((a, b) => a.distance - b.distance); // closest first
 
-  // Optional: extract only drivers if you don’t need distance
   const nearbyDrivers = nearbyDriversWithDistance.map(({ driver }) => driver);
-  // const result = nearbyDrivers.map((el) => el.location);
 
   return nearbyDrivers;
 };

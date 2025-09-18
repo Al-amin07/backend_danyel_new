@@ -98,6 +98,18 @@ const acceptLoadRequest = catchAsync(async (req: Request, res: Response) => {
     statusCode: StatusCodes.OK,
   });
 });
+const addDriverToCompany = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.user;
+  const { userId } = req.body;
+  const result = await companyService.addDriverToCompany(id, userId);
+
+  sendResponse(res, {
+    data: result,
+    message: 'Driver added to company successfully',
+    success: true,
+    statusCode: StatusCodes.OK,
+  });
+});
 
 export const companyController = {
   getAllCompany,
@@ -108,4 +120,5 @@ export const companyController = {
   sendNotificationToSuggestedDrivers,
   getCompanyEarning,
   acceptLoadRequest,
+  addDriverToCompany,
 };

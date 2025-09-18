@@ -53,10 +53,8 @@ export const sendNotification = async (notificationData: INotification) => {
   if (!user) return;
   try {
     const io = getIO();
-    // const receiverSocketId = onlineUsers[String('68b659c9778a2b206a349ed3')];
-    console.log('sgdsf');
+
     const receiverSocketId = onlineUsers[String(notificationData?.receiverId)];
-    //   console.log({ receiverSocketId, form: notification, onlineUsers });
     console.log('sgvgfv', receiverSocketId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit('receive_notification', result);
@@ -101,7 +99,7 @@ const getSingleNotificationData = async (id: string) => {
   const notification = await Notification.findById(id)
     .populate({
       path: 'senderId',
-      select: 'name email profileImage _id',
+      select: 'name email profileImage _id role',
     })
     .populate({
       path: 'receiverId',
@@ -109,8 +107,28 @@ const getSingleNotificationData = async (id: string) => {
     })
     .populate({
       path: 'load',
-      populate: 'companyId',
+      populate: [
+        {
+          path: 'companyId',
+        },
+        {
+          path: 'requestedDrivers',
+          populate: {
+            path: 'user', // 👈 populate the user field inside requestedDrivers
+            select: 'name email profileImage _id role', // optional, pick only what you need
+          },
+        },
+      ],
     });
+  if ((notification?.senderId as any)?.role === 'driver') {
+    const driver = await Driver.findOne({
+      user: (notification?.senderId as any)?.id,
+    });
+
+    (notification as any).driver = driver;
+  }
+  console.log({ notification });
+
   return notification;
 };
 
@@ -123,6 +141,10 @@ const getMyNotification = async (id: string) => {
     .populate({
       path: 'receiverId',
       select: 'name email profileImage',
+    })
+    .populate({
+      path: 'load',
+      populate: 'companyId',
     })
     .sort({ createdAt: -1 });
   return result;

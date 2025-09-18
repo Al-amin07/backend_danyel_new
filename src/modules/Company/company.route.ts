@@ -37,5 +37,10 @@ companyRoute.patch(
   auth(userRole.company, userRole.admin, userRole.superAdmin),
   companyController.acceptLoadRequest,
 );
+companyRoute.patch(
+  '/add-driver',
+  auth(userRole.company, userRole.admin, userRole.superAdmin),
+  companyController.addDriverToCompany,
+);
 
 export default companyRoute;

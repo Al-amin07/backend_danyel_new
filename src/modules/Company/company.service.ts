@@ -420,6 +420,7 @@ const sendNotificationToSuggestedDrivers = async (
 const acceptLoadRequest = async (payload: {
   loadId: string;
   userId: string;
+  isAccepted: boolean;
 }) => {
   const isLoadExist = await LoadModel.findById(payload.loadId).populate({
     path: 'companyId',
@@ -436,6 +437,16 @@ const acceptLoadRequest = async (payload: {
   }
   if (isDriverExist.currentLoad) {
     throw new ApppError(StatusCodes.BAD_REQUEST, 'Driver already has a load');
+  }
+  if (!payload?.isAccepted) {
+    const result = await LoadModel.findByIdAndUpdate(
+      payload.loadId,
+      {
+        $pull: { requestedDrivers: isDriverExist?.id },
+      },
+      { new: true },
+    );
+    return result;
   }
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -461,7 +472,11 @@ const acceptLoadRequest = async (payload: {
     // 2️⃣ Update Driver directly
     const updatedDriver = await Driver.findByIdAndUpdate(
       isDriverExist?.id,
-      { currentLoad: payload.loadId, availability: 'On Duty' },
+      {
+        currentLoad: payload.loadId,
+        availability: 'On Duty',
+        $addToSet: { loads: payload?.loadId },
+      },
       { new: true, session },
     ).populate('user');
     if (updatedDriver) {
@@ -485,6 +500,43 @@ const acceptLoadRequest = async (payload: {
   }
 };
 
+const addDriverToCompany = async (
+  companyUserId: string,
+  driverUserId: string,
+) => {
+  const company = await Company.findOne({ user: companyUserId }).populate(
+    'user',
+  );
+  if (!company) {
+    throw new ApppError(StatusCodes.NOT_FOUND, 'Company not found');
+  }
+  const driver = await Driver.findOne({ user: driverUserId }).populate('user');
+  if (!driver) {
+    throw new ApppError(StatusCodes.NOT_FOUND, 'Driver not found');
+  }
+  if (company.drivers.includes(driver?.id)) {
+    throw new ApppError(StatusCodes.BAD_REQUEST, 'Driver already added');
+  }
+  const updatedCompany = await Company.findByIdAndUpdate(
+    company.id,
+    { $addToSet: { drivers: driver?.id } },
+    { new: true },
+  );
+  const updatedDriver = await Driver.findByIdAndUpdate(
+    driver?.id,
+    { company: updatedCompany?.id },
+    { new: true },
+  );
+  await notificationService.sendNotification({
+    content: `You have been added to company ${updatedCompany?.companyName}`,
+    type: ENotificationType.JOIN_REQUEST,
+    receiverId: new Types.ObjectId(driver?.user?.id),
+    senderId: new Types.ObjectId(company?.user?.id),
+  });
+
+  return updatedDriver;
+};
+
 export const companyService = {
   getAllCompanyFromDb,
   getSingleCompany,
@@ -493,5 +545,6 @@ export const companyService = {
   companyStat,
   sendNotificationToSuggestedDrivers,
   getCompanyEarning,
+  addDriverToCompany,
   acceptLoadRequest,
 };
