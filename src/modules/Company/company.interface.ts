@@ -40,6 +40,7 @@ export interface ICompany extends Document {
 
   loads: Types.ObjectId[];
   drivers: Types.ObjectId[];
+  requestedDrivers: Types.ObjectId[];
 }
 
 export type TCompanyUser = TUser & ICompany;

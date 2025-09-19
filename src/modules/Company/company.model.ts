@@ -40,6 +40,7 @@ const CompanySchema = new Schema<ICompany>(
     dateFormat: { type: String, default: 'MM/DD/YYYY' },
     loads: [{ type: Schema.Types.ObjectId, ref: 'Load' }],
     drivers: [{ type: Schema.Types.ObjectId, ref: 'Driver' }],
+    requestedDrivers: [{ type: Schema.Types.ObjectId, ref: 'Driver' }],
   },
   { timestamps: true },
 );

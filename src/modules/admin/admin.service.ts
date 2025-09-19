@@ -25,7 +25,7 @@ const getAdminState = async () => {
   ]);
   const loads = await LoadModel.find({})
     .limit(3)
-    .populate('assignedDriver')
+    .populate({ path: 'assignedDriver', populate: 'user' })
     .lean();
   const users = await User.find().limit(3).lean();
   return {

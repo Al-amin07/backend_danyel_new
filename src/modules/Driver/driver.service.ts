@@ -23,12 +23,49 @@ import { User } from '../user/user.model';
 import { endOfWeek, startOfWeek } from 'date-fns';
 import { ENotificationType } from '../notification/notification.interface';
 import { getLatLon } from '../../util/getLayLon';
-const getAllDriver = async (query: Record<string, unknown>) => {
+import { JwtPayload } from 'jsonwebtoken';
+import { userRole } from '../../constents';
+const getAllDriver = async (
+  query: Record<string, unknown>,
+  user: JwtPayload,
+) => {
+  if (user.role === userRole.admin || user?.role === userRole.superAdmin) {
+    const driverQuery = new QueryBuilder(
+      Driver.find().populate({
+        path: 'user',
+        select: 'name email profileImage role',
+      }),
+      query,
+    )
+      .search([
+        'user.name',
+        'driverId',
+        'user.email',
+        'location.city',
+        'location.street',
+        'location.zipCode',
+        'vehicleType',
+        'vehicleModel',
+        'availability',
+      ])
+      .filter()
+      .sort()
+      .paginate();
+    const result = await driverQuery.modelQuery;
+    const meta = await driverQuery.getMetaData();
+    return {
+      data: result,
+      meta,
+    };
+  }
+  const isCompanyExist = await Company.findOne({ user: user?.id });
   const driverQuery = new QueryBuilder(
-    Driver.find().populate({
-      path: 'user',
-      select: 'name email profileImage role',
-    }),
+    Driver.find({ company: isCompanyExist?.id })
+      .populate({
+        path: 'user',
+        select: 'name email profileImage role',
+      })
+      .populate('currentLoad'),
     query,
   )
     .search([
@@ -95,7 +132,21 @@ const updateDriverProfileIntoDb = async (
     if (!isCompanyExist) {
       throw new ApppError(StatusCodes.BAD_REQUEST, 'Company not found');
     }
+
     const isDriverExist = await Driver.findOne({ user: id }).populate('user');
+    if (isCompanyExist?.requestedDrivers?.includes(isDriverExist?.id)) {
+      throw new ApppError(
+        StatusCodes.BAD_REQUEST,
+        'Already requested to join this company',
+      );
+    }
+    await Company.findByIdAndUpdate(
+      isCompanyExist?.id,
+      {
+        $addToSet: { requestedDrivers: isDriverExist?.id },
+      },
+      { new: true },
+    );
     await notificationService.sendNotification({
       content: `New join request from ${(isDriverExist?.user as any)?.name}`,
       type: ENotificationType.JOIN_REQUEST,
@@ -286,7 +337,9 @@ const updateLoadStatus = async (
     );
   }
 
-  const isDriverExist = await Driver.findOne({ user: id }).populate('user');
+  const isDriverExist = await Driver.findOne({ user: id })
+    .populate('user')
+    .populate('loads');
   if (!isDriverExist) {
     throw new ApppError(
       StatusCodes.NOT_FOUND,
@@ -336,7 +389,10 @@ const updateLoadStatus = async (
       { new: true },
     );
     if (payload?.status === 'Delivered') {
-      await updateDriverOnTimeRate(isDriverExist?._id as string);
+      await updateDriverOnTimeRate(
+        isDriverExist?._id as string,
+        isLoadExist?.deliveryDate as Date,
+      );
 
       await notificationService.sendNotification({
         content: `Load ${isLoadExist?.loadId} has been successfully deliveried by ${(isDriverExist?.user as any)?.name}`,
@@ -348,7 +404,7 @@ const updateLoadStatus = async (
     } else if (payload?.status === 'Cancelled') {
       await Driver.findByIdAndUpdate(isDriverExist?._id, {
         $set: { currentLoad: null, availability: 'Available' },
-        $pull: { loads: payload?.loadId },
+        // $pull: { loads: payload?.loadId },
       });
       await notificationService.sendNotification({
         content: `Load ${isLoadExist?.loadId} has been cancelled  by ${(isDriverExist?.user as any)?.name}`,
@@ -413,7 +469,10 @@ const reviewDriver = async (id: string, payload: IReview, userId: string) => {
   console.log({ payload, isDriverExist, averageRating, sendNotification });
   const result = await Driver.findByIdAndUpdate(
     id,
-    { $push: { reviews: payload }, $set: { averageRating } },
+    {
+      $push: { reviews: payload },
+      $set: { averageRating: Number(averageRating).toFixed(1) },
+    },
     { new: true },
   );
   const updatedLoad = await LoadModel.findByIdAndUpdate(
@@ -813,93 +872,39 @@ export const driverService = {
   setDriverLocation,
 };
 
-export const updateDriverOnTimeRate = async (driverId: string) => {
+export const updateDriverOnTimeRate = async (
+  driverId: string,
+  deliveryDate: Date,
+) => {
   if (!driverId) return;
 
-  const deliveredLoads = await LoadModel.aggregate([
-    { $match: { assignedDriver: driverId, loadStatus: 'Delivered' } },
-    {
-      $addFields: {
-        expectedDate: {
-          $ifNull: [
-            { $last: '$statusTimeline.expectedDeliveryDate' },
-            '$deliveryDate',
-          ],
-        },
-      },
-    },
-    {
-      $project: {
-        onTime: {
-          $cond: [{ $lte: ['$deliveryDate', '$expectedDate'] }, 1, 0],
-        },
-      },
-    },
-    {
-      $group: {
-        _id: null,
-        totalDelivered: { $sum: 1 },
-        onTimeDelivered: { $sum: '$onTime' },
-      },
-    },
-    {
-      $project: {
-        _id: 0,
-        onTimeRate: {
-          $cond: [
-            { $eq: ['$totalDelivered', 0] },
-            0,
-            {
-              $multiply: [
-                { $divide: ['$onTimeDelivered', '$totalDelivered'] },
-                100,
-              ],
-            },
-          ],
-        },
-      },
-    },
-  ]);
+  // Aggregate all delivered loads for this driver
+  const driver = await Driver.findById(driverId).populate('loads');
+  const delivaryLoads = await LoadModel.find({
+    assignedDriver: driverId,
+    loadStatus: 'Delivered',
+  });
+  if (!driver) return;
 
-  const onTimeRate = deliveredLoads[0]?.onTimeRate || 0;
+  // Determine if this load was delivered on time
+  const isOnTime = new Date(deliveryDate) >= new Date();
+  console.log({ isOnTime, deliveryDate, newDate: new Date() });
+  // Get previous totals or default to 0
+  const previousTotalDelivered = delivaryLoads?.length || 0;
+  const previousOnTimeDelivered = driver?.onTimeRate || 0;
 
-  // Update the driver document
+  // Increment totals
+  const totalDelivered = previousTotalDelivered + 1;
+  const onTimeDelivered = previousOnTimeDelivered + (isOnTime ? 1 : 0);
+  console.log({ totalDelivered, onTimeDelivered });
+  // Calculate new on-time rate
+  const onTimeRate = Number(
+    ((onTimeDelivered / totalDelivered) * 100).toFixed(1),
+  );
+
   const res = await Driver.findByIdAndUpdate(
     driverId,
     { onTimeRate, currentLoad: null, availability: 'Available' },
     { new: true },
   );
 };
-
-// const drivers = await Driver.find({
-//   availability: EAvailability.AVAILABLE,
-//   status: true,
-//   currentLoad: null,
-// })
-//   .populate('loads')
-//   .populate('user')
-//   .lean();
-
-// if (!drivers.length) return [];
-
-// // Scoring weights
-// const WEIGHTS = {
-//   rating: 0.5, // 50% importance
-//   onTime: 0.5, // 50% importance
-// };
-
-// // Normalize and score drivers
-// const scoredDrivers = drivers.map((driver: any) => {
-//   const ratingScore = (driver.averageRating || 0) / 5; // normalize to 0-1
-//   const onTimeScore = (driver.onTimeRate || 0) / 100; // assuming it's percentage
-
-//   const score = ratingScore * WEIGHTS.rating + onTimeScore * WEIGHTS.onTime;
-
-//   return { ...driver, score };
-// });
-
-// // Sort by best score
-// scoredDrivers.sort((a, b) => b.score - a.score);
-
-// // Return top 3 drivers
-// return scoredDrivers.slice(0, 3);

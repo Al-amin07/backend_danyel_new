@@ -34,7 +34,9 @@ const createLoadToDB = async (
   }
   payload.companyId = isCompanyExist._id.toString();
 
-  payload.totalPayment = payload.totalDistance * payload.ratePerMile;
+  payload.totalPayment = Number(
+    (payload.totalDistance * payload.ratePerMile).toFixed(3),
+  );
 
   if (!files || files.length === 0) {
     throw new ApppError(StatusCodes.NOT_FOUND, 'No files uploaded');

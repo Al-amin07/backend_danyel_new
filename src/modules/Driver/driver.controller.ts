@@ -64,8 +64,9 @@ const reviewDriver = catchAsync(async (req: Request, res: Response) => {
 });
 const getAllDriver = catchAsync(async (req: Request, res: Response) => {
   const query = req.query;
-  console.log({ query });
-  const result = await driverService.getAllDriver(query);
+  const { id, role } = req.user as JwtPayload;
+  console.log({ id, role });
+  const result = await driverService.getAllDriver(query, req.user);
   sendResponse(res, {
     success: true,
     message: 'Drivers retrived successfully!!!',

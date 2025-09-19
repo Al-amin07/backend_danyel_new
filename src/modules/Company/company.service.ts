@@ -8,10 +8,8 @@ import { LoadModel } from '../load/load.model';
 import { notificationService } from '../notification/notification.service';
 import mongoose, { Types } from 'mongoose';
 import { ENotificationType } from '../notification/notification.interface';
-import { ILoad } from '../load/load.interface';
 import { User } from '../user/user.model';
 import { Driver } from '../Driver/driver.model';
-import path from 'path';
 
 const getAllCompanyFromDb = async (query: Record<string, unknown>) => {
   const companyQuery = new QueryBuilder(Company.find(), query)
@@ -37,7 +35,7 @@ const getSingleCompany = async (id: string) => {
   const result = await Company.findById(id)
     .populate('user')
     .populate('loads')
-    .populate('drivers')
+    .populate({ path: 'drivers', populate: 'user currentLoad' })
     .select('-password');
   return result;
 };
@@ -145,28 +143,16 @@ const companyStat = async (id: string) => {
     .populate('loads');
   // console.log({ id, isCompanyExist: isCompanyExist?.loads });
   const allLoads = await LoadModel.find({ companyId: isCompanyExist?.id });
-  const activeLoads = allLoads.filter(
-    (el) => el.loadStatus !== 'Delivered',
-  ).length;
+  const activeLoads = allLoads.filter((el) => {
+    if (el.loadStatus !== 'Delivered' && el.loadStatus !== 'Cancelled') {
+      return el;
+    }
+  }).length;
   const unassignedLoads = allLoads.filter((el) => !el.assignedDriver).length;
 
   const totalAmount = allLoads.reduce((acc, el) => acc + el.totalPayment, 0);
-  const totalDriver = await LoadModel.aggregate([
-    { $match: { companyId: isCompanyExist?.id } },
-    { $match: { assignedDriver: { $exists: true, $ne: null } } },
-    { $group: { _id: '$assignedDriver' } }, // unique
-    {
-      $lookup: {
-        from: 'drivers', // collection name must be lowercase plural
-        localField: '_id',
-        foreignField: '_id',
-        as: 'driver',
-      },
-    },
-    { $unwind: '$driver' },
-  ]);
 
-  const drivers = await Driver.find({})
+  const drivers = await Driver.find({ company: isCompanyExist?.id })
     .populate('loads')
     .populate('user')
     .lean();
@@ -198,7 +184,7 @@ const companyStat = async (id: string) => {
     unassignedLoads,
     topDrivers: scoredDrivers.slice(0, 3),
     totalAmount,
-    totalDriver: totalDriver.map((d) => d.driver)?.length,
+    totalDriver: isCompanyExist?.drivers?.length,
   };
 };
 
@@ -429,6 +415,9 @@ const acceptLoadRequest = async (payload: {
   if (!isLoadExist) {
     throw new ApppError(StatusCodes.NOT_FOUND, 'Load not found');
   }
+  if (isLoadExist?.loadStatus === 'Delivered') {
+    throw new ApppError(StatusCodes.BAD_REQUEST, 'This Load already delivered');
+  }
   const isDriverExist = await Driver.findOne({ user: payload.userId }).populate(
     'user',
   );
@@ -503,6 +492,7 @@ const acceptLoadRequest = async (payload: {
 const addDriverToCompany = async (
   companyUserId: string,
   driverUserId: string,
+  isApproved: boolean,
 ) => {
   const company = await Company.findOne({ user: companyUserId }).populate(
     'user',
@@ -517,9 +507,30 @@ const addDriverToCompany = async (
   if (company.drivers.includes(driver?.id)) {
     throw new ApppError(StatusCodes.BAD_REQUEST, 'Driver already added');
   }
+  if (!isApproved) {
+    if (!company?.requestedDrivers?.includes(driver?.id)) {
+      throw new ApppError(StatusCodes.BAD_REQUEST, 'Driver already rejected');
+    }
+
+    await Company.findByIdAndUpdate(
+      company.id,
+      { $pull: { requestedDrivers: driver?.id } },
+      { new: true },
+    );
+    await notificationService.sendNotification({
+      content: `You have been rejected by company ${company?.companyName}`,
+      type: ENotificationType.JOIN_REQUEST,
+      receiverId: new Types.ObjectId(driver?.user?.id),
+      senderId: new Types.ObjectId(company?.user?.id),
+    });
+    return driver;
+  }
   const updatedCompany = await Company.findByIdAndUpdate(
     company.id,
-    { $addToSet: { drivers: driver?.id } },
+    {
+      $addToSet: { drivers: driver?.id },
+      $pull: { requestedDrivers: driver?.id },
+    },
     { new: true },
   );
   const updatedDriver = await Driver.findByIdAndUpdate(

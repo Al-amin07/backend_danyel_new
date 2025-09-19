@@ -100,8 +100,12 @@ const acceptLoadRequest = catchAsync(async (req: Request, res: Response) => {
 });
 const addDriverToCompany = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.user;
-  const { userId } = req.body;
-  const result = await companyService.addDriverToCompany(id, userId);
+  const { userId, isApproved } = req.body;
+  const result = await companyService.addDriverToCompany(
+    id,
+    userId,
+    isApproved,
+  );
 
   sendResponse(res, {
     data: result,
