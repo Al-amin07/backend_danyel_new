@@ -3,6 +3,7 @@ import catchAsync from '../../util/catchAsync';
 import { companyService } from './company.service';
 import sendResponse from '../../util/sendResponse';
 import { StatusCodes } from 'http-status-codes';
+import { JwtPayload } from 'jsonwebtoken';
 
 const getAllCompany = catchAsync(async (req: Request, res: Response) => {
   const query = req.query;
@@ -115,6 +116,21 @@ const addDriverToCompany = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const updateProfileImage = catchAsync(async (req: Request, res: Response) => {
+  const id = (req.user as JwtPayload).id;
+
+  const result = await companyService.updateCompanyLogo(
+    id,
+    req.file as Express.Multer.File,
+  );
+  sendResponse(res, {
+    success: true,
+    message: 'profile update  successfully',
+    data: result,
+    statusCode: StatusCodes.OK,
+  });
+});
+
 export const companyController = {
   getAllCompany,
   getSingleCompany,
@@ -125,4 +141,5 @@ export const companyController = {
   getCompanyEarning,
   acceptLoadRequest,
   addDriverToCompany,
+  updateProfileImage,
 };

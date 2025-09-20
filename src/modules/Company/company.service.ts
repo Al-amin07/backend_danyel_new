@@ -10,6 +10,7 @@ import mongoose, { Types } from 'mongoose';
 import { ENotificationType } from '../notification/notification.interface';
 import { User } from '../user/user.model';
 import { Driver } from '../Driver/driver.model';
+import config from '../../config';
 
 const getAllCompanyFromDb = async (query: Record<string, unknown>) => {
   const companyQuery = new QueryBuilder(Company.find(), query)
@@ -88,6 +89,17 @@ const updateCompany = async (userId: string, payload: ICompany) => {
     .populate('drivers')
     .select('-password');
   console.log({ result });
+  return result;
+};
+
+const updateCompanyLogo = async (userId: string, file: Express.Multer.File) => {
+  let profileImage = '';
+  console.log({ file });
+  if (!file?.path) {
+    throw new ApppError(StatusCodes.BAD_REQUEST, 'Please upload a photo');
+  }
+  profileImage = `${config.server_url}/uploads/${file?.filename}`;
+  const result = await User.findByIdAndUpdate(userId, { profileImage });
   return result;
 };
 
@@ -558,4 +570,5 @@ export const companyService = {
   getCompanyEarning,
   addDriverToCompany,
   acceptLoadRequest,
+  updateCompanyLogo,
 };

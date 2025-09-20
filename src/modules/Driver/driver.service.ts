@@ -31,10 +31,12 @@ const getAllDriver = async (
 ) => {
   if (user.role === userRole.admin || user?.role === userRole.superAdmin) {
     const driverQuery = new QueryBuilder(
-      Driver.find().populate({
-        path: 'user',
-        select: 'name email profileImage role',
-      }),
+      Driver.find()
+        .populate({
+          path: 'user',
+          select: 'name email profileImage role',
+        })
+        .populate('currentLoad'),
       query,
     )
       .search([

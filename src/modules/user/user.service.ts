@@ -238,6 +238,7 @@ const getUserProfile = async (userId: string) => {
     })
       .populate('user', '-password')
       .populate('loads');
+    // .populate('drives');
     return companyProfile;
   } else if (isUserExist?.role === 'driver') {
     const driverProfile = await Driver.findOne({
@@ -246,6 +247,11 @@ const getUserProfile = async (userId: string) => {
       .populate('user', '-password')
       .populate('loads')
       .populate('currentLoad')
+      .populate({
+        path: 'company',
+        select: 'companyName',
+        populate: { path: 'user', select: 'profileImage name email' },
+      })
       .populate('reviews.loadId');
     return driverProfile;
   } else {
