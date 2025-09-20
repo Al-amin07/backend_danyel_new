@@ -2,6 +2,7 @@ import express from 'express';
 import { companyController } from './company.controller';
 import auth from '../../middleware/auth';
 import { userRole } from '../../constents';
+import { upload } from '../../util/uploadImgToCloudinary';
 
 const companyRoute = express.Router();
 
@@ -10,6 +11,13 @@ companyRoute.get(
   '/myload',
   auth(userRole.company),
   companyController.getAllLoadOfCompany,
+);
+
+companyRoute.patch(
+  '/update-profile-image',
+  upload.single('profile'),
+  auth(userRole.driver, userRole.company, userRole.admin, userRole.superAdmin),
+  companyController.updateProfileImage,
 );
 companyRoute.get(
   '/mystat',

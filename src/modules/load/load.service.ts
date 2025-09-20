@@ -196,6 +196,7 @@ const getAllLoadsByDriver = async (
   const loadQuery = new QueryBuilder(
     LoadModel.find({
       loadStatus: 'Pending Assignment',
+      companyId: isDriverExist?.company,
       _id: { $nin: isDriverExist?.declinedLoads || [] },
     }),
     query,
